@@ -12,3 +12,9 @@ python-multipart>=0.0.9
 
 # 5. THE IMAGE PROCESSOR: Converts raw uploaded file bytes in memory into clean RGB layouts for YOLO
 pillow>=10.4.0
+
+# 6. THE TESTING FRAMEWORK: Runs automated unit tests to validate backend logic
+pytest
+
+# 7. THE HTTP CLIENT: Simulates API requests during testing
+httpx

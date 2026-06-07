@@ -1,5 +1,6 @@
 import io
 import os
+from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from PIL import Image
@@ -13,31 +14,50 @@ app = FastAPI(
 )
 
 # Target the weights path relative to this file location
-MODEL_PATH = "weights/best.pt"
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "weights" / "best.pt"
 
-if os.path.exists(MODEL_PATH):
+model = None
+
+
+if MODEL_PATH.exists():
     print(f" Loading trained weights from {MODEL_PATH}...")
-    model = YOLO(MODEL_PATH)
+    model = YOLO(str(MODEL_PATH))
 else:
-    raise RuntimeError(f" Critical Error: Model weights not found at {MODEL_PATH}")
+    print(f" Warning: Model weights not found at {MODEL_PATH}. Prediction endpoint will be disabled.")
 
 
 # 2. Health Check Endpoint
 
 @app.get("/")
 async def root():
-    return {"message": "Service is up"}
+    return {"message": "Service is running and ready to accept requests."}
+
 
 # Status endpoint — model info
 @app.get("/status")
 def get_status():
-    return {"message": "YOLO FastAPI is running", "model": "best.pt"}
+    status_str = "best.pt loaded" if model is not None else "No model loaded (offline)"
+    return {
+        "message": "YOLO FastAPI is running", 
+        "model": status_str
+    }
+
+
 @app.post("/predict")
 async def predict_table_layout(file: UploadFile = File(...)):
     """
     Accepts an uploaded image file, processes it through the YOLO model,
     and returns detected bounding boxes, confidence scores, and class labels.
     """
+
+    # Safety Shield: Block execution if model is not loaded or has been deleted
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail="AI Model weights are missing or unloaded on this server. Prediction is currently disabled."
+        )
+
     # Validate file type extension
     extension = file.filename.split(".")[-1].lower()
     if extension not in ["jpg", "jpeg", "png"]:
@@ -89,11 +109,41 @@ async def predict_table_layout(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Inference Engine Error: {str(e)}")
     
 
+# 4. Model Lifecycle Management Endpoints
+
 @app.put("/update_model")
 async def update_model(weight_path: str):
-        try:
-            global model
-            model = YOLO(weight_path)   # reload with new weights
-            return {"message": f"Model updated to {weight_path}"}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to update model: {str(e)}")
+    """
+    Dynamically allows manual swapping or reloading of weights via path parameter.
+    """
+    try:
+        global model
+        target_path = Path(weight_path)
+        if not target_path.is_absolute():
+            target_path = BASE_DIR / weight_path
+
+        if not target_path.exists():
+            raise FileNotFoundError(f"No file found at {target_path}")
+
+        model = YOLO(str(target_path))  # reload with new weights
+        return {"message": f"Model updated perfectly to {target_path}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update model: {str(e)}")
+
+
+@app.delete("/delete_model")
+async def delete_model():
+    """
+    Safely unloads the active YOLO model from RAM memory and disables the prediction endpoint.
+    """
+    global model
+    if model is None:
+        return {"message": "No active model was loaded to delete."}
+    
+    try:
+        # Clear the model instance from system memory
+        del model
+        model = None  # Reset variable back to blank state
+        return {"message": "Model successfully unloaded and removed from memory."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear model from memory: {str(e)}")
