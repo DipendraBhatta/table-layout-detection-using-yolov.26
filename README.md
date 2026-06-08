@@ -1,4 +1,4 @@
-# YOLOv8 Table Layout Detector
+# YOLOv26 Table Layout Detector
 
 A full-stack document intelligence system that detects and segments table structures — including column headers and projected row headers — from document images using a custom-trained YOLOv8 model.
 
