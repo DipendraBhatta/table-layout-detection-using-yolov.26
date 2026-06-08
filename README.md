@@ -245,8 +245,9 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) runs automatically on e
 ---
 
 ## Sample Output
+The screenshot below shows a real inference run on a medical benefits document:
 
-The screenshot below shows a real inference run on a medical benefits document (`assets/Screenshot From 2026-06-08 09-33-42.png`, 2550 × 3300 px).
+![Sample Output](assets/sample_output.png)
 
 ### Inference Visualizer Canvas
 
